@@ -1,0 +1,19 @@
+# OS
+.DS_Store
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Env / secrets (safety net — subfolders also ignore these)
+.env
+*.env
+**/.env
+**/serviceAccount.json
+
+# Build output
+dist/
+**/dist/
+
+# Logs
+*.log
