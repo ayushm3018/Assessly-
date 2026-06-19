@@ -29,6 +29,7 @@ function InterviewHistory() {
     };
 
     const isFinished = (i) => i.status === "completed"
+    const isTerminated = (i) => i.status === "terminated"
 
     // Average/best only consider finished interviews — abandoned runs score 0 and
     // would otherwise drag these stats down misleadingly.
@@ -90,6 +91,9 @@ function InterviewHistory() {
                                     {isFinished(item) ? (
                                         <span className='flex-none w-11 h-11 rounded-xl flex items-center justify-center text-base font-bold text-[#0a0a0a]'
                                             style={{ background: badge(item.finalScore || 0) }}>{Number(item.finalScore || 0).toFixed(1)}</span>
+                                    ) : isTerminated(item) ? (
+                                        <span className='flex-none w-11 h-11 rounded-xl flex items-center justify-center text-base font-bold text-[#0a0a0a]'
+                                            style={{ background: 'linear-gradient(135deg,#f87171,#fca5a5,#ef4444)' }}>0.0</span>
                                     ) : (
                                         <span className='flex-none w-11 h-11 rounded-xl flex items-center justify-center text-lg font-light text-zinc-500 bg-white/[0.04] border border-white/10'>—</span>
                                     )}
@@ -107,10 +111,19 @@ function InterviewHistory() {
                                             {item.experience}
                                         </span>
                                     )}
-                                    <span className={`flex-none text-[11.5px] px-3 py-1.5 rounded-full font-medium ${isFinished(item) ? 'text-emerald-300' : 'text-amber-300'}`}
-                                        style={{ background: isFinished(item) ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', border: `1px solid ${isFinished(item) ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'}` }}>
-                                        {isFinished(item) ? "Completed" : "Not finished"}
-                                    </span>
+                                    {(() => {
+                                        const s = isFinished(item)
+                                            ? { color: 'text-emerald-300', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.3)', label: 'Completed' }
+                                            : isTerminated(item)
+                                                ? { color: 'text-red-300', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.35)', label: 'Terminated' }
+                                                : { color: 'text-amber-300', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.3)', label: 'Not finished' };
+                                        return (
+                                            <span className={`flex-none text-[11.5px] px-3 py-1.5 rounded-full font-medium ${s.color}`}
+                                                style={{ background: s.bg, border: `1px solid ${s.border}` }}>
+                                                {s.label}
+                                            </span>
+                                        );
+                                    })()}
                                 </div>
                             </motion.div>
                         ))}

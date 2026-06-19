@@ -26,6 +26,21 @@ function Step3Report({ report }) {
     questionWiseScore = [],
   } = report;
 
+  // A terminated run is void: force a 0 score and show why.
+  const isTerminated = report.terminated || report.status === "terminated";
+  const reasonLabels = {
+    "phone-detected": "phone detected",
+    "multiple-faces": "another person in frame",
+    "no-face": "candidate not visible",
+    "looking-away": "looking away from screen",
+    "tab-switch": "switched tab",
+    "fullscreen-exit": "exited fullscreen",
+    "window-blur": "switched window/app",
+  };
+  const terminationReasons = (report.violationReasons || [])
+    .map((r) => reasonLabels[r] || r)
+    .join(", ");
+
   const questionScoreData = questionWiseScore.map((score, index) => ({
     name: `Q${index + 1}`,
     score: score.score || 0
@@ -208,17 +223,42 @@ function Step3Report({ report }) {
           <button onClick={downloadPDF} className='btn-metal px-6 py-3 rounded-xl font-semibold text-sm'>Download PDF</button>
         </div>
 
+        {/* terminated banner */}
+        {isTerminated && (
+          <div className='mb-8 rounded-2xl px-6 py-5 flex items-start gap-4 border'
+            style={{ background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.35)' }}>
+            <span className='flex-none w-9 h-9 rounded-full flex items-center justify-center text-lg font-bold'
+              style={{ background: 'rgba(239,68,68,0.18)', color: '#fca5a5' }}>!</span>
+            <div>
+              <p className='font-semibold text-red-300'>Interview Terminated</p>
+              <p className='text-sm text-zinc-400 font-light mt-1 leading-relaxed'>
+                This interview was terminated after 3 proctoring violations. The score has been recorded as 0.
+              </p>
+              {terminationReasons && (
+                <p className='text-sm text-zinc-300 font-light mt-2 leading-relaxed'>
+                  <span className='text-zinc-500'>Detected:</span> {terminationReasons}.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* hero score */}
         <div className='text-center'>
-          <div className='text-xs tracking-[0.3em] uppercase text-zinc-500 font-semibold'>Session Complete</div>
-          <div className='text-metal font-extralight leading-none mt-4' style={{ fontSize: 'clamp(96px,15vw,168px)', filter: 'drop-shadow(0 0 40px rgba(200,200,200,0.2))' }}>
-            {Number(finalScore || 0).toFixed(1)}
+          <div className='text-xs tracking-[0.3em] uppercase text-zinc-500 font-semibold'>
+            {isTerminated ? "Session Terminated" : "Session Complete"}
+          </div>
+          <div className={`font-extralight leading-none mt-4 ${isTerminated ? '' : 'text-metal'}`}
+            style={{ fontSize: 'clamp(96px,15vw,168px)', filter: 'drop-shadow(0 0 40px rgba(200,200,200,0.2))', color: isTerminated ? '#f87171' : undefined }}>
+            {isTerminated ? "0.0" : Number(finalScore || 0).toFixed(1)}
           </div>
           <div className='text-zinc-400 font-light tracking-wide'>Overall Score · out of 10</div>
-          <div className='mt-4'>
-            <p className='font-medium text-zinc-100'>{performanceText}</p>
-            <p className='text-zinc-500 text-sm mt-1 font-light'>{shortTagline}</p>
-          </div>
+          {!isTerminated && (
+            <div className='mt-4'>
+              <p className='font-medium text-zinc-100'>{performanceText}</p>
+              <p className='text-zinc-500 text-sm mt-1 font-light'>{shortTagline}</p>
+            </div>
+          )}
         </div>
 
         {/* metric rings */}
