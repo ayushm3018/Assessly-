@@ -40,7 +40,7 @@ function Navbar() {
         style={{ boxShadow: '0 12px 40px rgba(0,0,0,0.45)' }}>
             <div onClick={()=>navigate("/")} className='flex items-center gap-2.5 cursor-pointer'>
                 <span className='w-2.5 h-2.5 rounded-full' style={{ background:'linear-gradient(135deg,#e8e8e8,#a0a0a0)', boxShadow:'0 0 12px rgba(200,200,200,0.5)' }}></span>
-                <h1 className='font-semibold tracking-tight text-[17px] text-zinc-100'>InterviewIQ</h1>
+                <h1 className='font-semibold tracking-tight text-[17px] text-zinc-100'>Assessly</h1>
             </div>
 
             <div className='flex items-center gap-4 relative'>

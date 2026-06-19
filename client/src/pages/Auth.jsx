@@ -35,7 +35,7 @@ function Auth({isModel = false}) {
         style={{ boxShadow:'0 30px 80px rgba(0,0,0,0.55)' }}>
             <div className='flex items-center justify-center gap-2.5 mb-7'>
                 <span className='w-2.5 h-2.5 rounded-full' style={{ background:'linear-gradient(135deg,#e8e8e8,#a0a0a0)', boxShadow:'0 0 12px rgba(200,200,200,0.5)' }}></span>
-                <h2 className='font-semibold tracking-tight text-zinc-100'>InterviewIQ</h2>
+                <h2 className='font-semibold tracking-tight text-zinc-100'>Assessly</h2>
             </div>
 
             <h1 className='text-2xl md:text-3xl font-extralight tracking-tight text-center leading-snug mb-4 text-zinc-50'>
