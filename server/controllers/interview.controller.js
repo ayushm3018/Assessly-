@@ -69,15 +69,18 @@ export const analyzeResume = async (req, res) => {
       {
         role: "system",
         content: `
-Extract structured data from resume.
+You analyze an uploaded document to extract resume/CV data.
+
+FIRST decide whether this document is actually a resume or CV — i.e. it describes a specific person's professional profile (work experience, education, skills, and/or projects). If it is NOT a resume (random text, an article, an invoice, a cover letter only, marketing copy, gibberish, or anything unrelated), set "isResume" to false and leave the other fields empty.
 
 Return strictly JSON:
 
 {
-  "role": "string",
-  "experience": "string",
-  "projects": ["project1", "project2"],
-  "skills": ["skill1", "skill2"]
+  "isResume": true or false,
+  "role": "the candidate's target or most recent role (e.g. 'Frontend Engineer'), or empty string",
+  "experience": "short experience phrase like 'Fresher', '2 years', '5 years', or empty string",
+  "projects": ["short project name or description", "..."],
+  "skills": ["skill", "..."]
 }
 `
       },
@@ -92,8 +95,18 @@ Return strictly JSON:
 
     fs.unlinkSync(filepath)
 
+    // Reject anything that isn't actually a resume so the interview can't run on
+    // an unrelated document. Also guard against an empty extraction.
+    if (parsed.isResume === false || !resumeText || resumeText.length < 40) {
+      return res.status(422).json({
+        isResume: false,
+        message: "This doesn't look like a resume. Please upload your actual resume (PDF).",
+      });
+    }
+
 
     res.json({
+      isResume: true,
       role: parsed.role,
       experience: parsed.experience,
       projects: parsed.projects,
@@ -139,6 +152,14 @@ export const generateQuestion = async (req, res) => {
       });
     }
 
+    // The interview is resume-based, so a real resume is required.
+    const safeResume = resumeText?.trim() || "";
+    if (!safeResume || safeResume.length < 40) {
+      return res.status(400).json({
+        message: "A resume is required. Please upload your resume so the interview can be based on it.",
+      });
+    }
+
     const projectText = Array.isArray(projects) && projects.length
       ? projects.join(", ")
       : "None";
@@ -146,8 +167,6 @@ export const generateQuestion = async (req, res) => {
     const skillsText = Array.isArray(skills) && skills.length
       ? skills.join(", ")
       : "None";
-
-    const safeResume = resumeText?.trim() || "None";
 
     // Decide difficulty/timing from experience, and describe the progression to the AI.
     const plan = getDifficultyPlan(experience);
@@ -181,9 +200,13 @@ Speak in simple, natural English as if you are directly talking to the candidate
 
 Generate exactly 5 interview questions that genuinely probe the candidate's depth, not surface-level trivia.
 
+This is a RESUME-BASED interview. The candidate's resume is provided below and is the primary source for your questions.
+
 Question design rules:
-- Ground every question in the candidate's actual role, experience level, projects, skills, and resume — reference specifics where possible (e.g. a named project or skill), never generic filler.
-- For a Technical interview: ask about real decisions, trade-offs, debugging, and how they would design or improve something. Avoid pure definition questions.
+- Ground every question in the candidate's ACTUAL resume — their named projects, listed skills, and stated experience. At least 3 of the 5 questions must explicitly reference a specific project or skill from the resume (name it).
+- Do NOT ask generic role questions that ignore the resume. If the resume mentions a project, dig into the decisions, trade-offs, and challenges of THAT project.
+- Use the role only as a lens for depth/level — the substance must come from the resume.
+- For a Technical interview: ask about real decisions, trade-offs, debugging, and how they would design or improve something from their resume. Avoid pure definition questions.
 - For an HR interview: ask about real situations, conflict, ownership, and motivation using behavioral ("tell me about a time...") framing.
 - This candidate is at a ${plan.level} level (experience: ${experience}). Pitch the questions at that level — do not ask a senior trivially easy questions or a fresher unrealistic ones.
 - Each question should invite a substantive, explainable answer (not yes/no).
@@ -334,13 +357,11 @@ Calculate:
 finalScore = average of confidence, communication, and correctness (rounded to nearest whole number).
 
 Feedback Rules:
-- Write natural human feedback.
-- 10 to 15 words only.
-- Sound like real interview feedback.
-- Can suggest improvement if needed.
-- Do NOT repeat the question.
-- Do NOT explain scoring.
-- Keep tone professional and honest.
+- Write in-depth, genuinely useful feedback the candidate can learn from (this is shown only in their final report, not during the interview).
+- Up to 4 lines maximum — roughly 40 to 70 words. Never exceed 4 lines.
+- Be specific: what was strong, what was missing or weak, and one concrete way to improve.
+- Do NOT repeat the question. Do NOT explain the scoring numbers.
+- Keep the tone professional, honest, and constructive.
 
 Follow-up question:
 ${allowFollowUp

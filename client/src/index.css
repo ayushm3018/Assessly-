@@ -63,6 +63,10 @@ body {
 @keyframes blobA { 0%{transform:translate(0,0) scale(1)} 33%{transform:translate(16vw,11vh) scale(1.32)} 66%{transform:translate(7vw,-9vh) scale(0.92)} 100%{transform:translate(0,0) scale(1)} }
 @keyframes blobB { 0%{transform:translate(0,0) scale(1.1)} 33%{transform:translate(-14vw,9vh) scale(0.88)} 66%{transform:translate(-20vw,-7vh) scale(1.24)} 100%{transform:translate(0,0) scale(1.1)} }
 @keyframes blobC { 0%{transform:translate(0,0) scale(1)} 50%{transform:translate(12vw,-15vh) scale(1.28)} 100%{transform:translate(0,0) scale(1)} }
+@keyframes loadingSweep { 0%{transform:translateX(-130%)} 100%{transform:translateX(400%)} }
+@keyframes orbBreath { 0%,100%{transform:scale(1)} 50%{transform:scale(1.04)} }
+/* game-style loader: eases toward ~90% then settles, like a real load screen */
+@keyframes loadCreep { 0%{transform:translateZ(0) scaleX(0.04)} 100%{transform:translateZ(0) scaleX(0.92)} }
 
 /* utility helpers */
 .text-metal {

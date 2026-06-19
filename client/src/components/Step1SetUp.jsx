@@ -6,6 +6,7 @@ import { ServerUrl } from '../App';
 import { useDispatch, useSelector } from 'react-redux';
 import { setUserData } from '../redux/userSlice';
 import AnimatedBackground from './AnimatedBackground';
+import LoadingOverlay from './LoadingOverlay';
 
 // Fixed experience bands. Keeping this structured (instead of free text) means the
 // value is always something the backend can map to a difficulty plan.
@@ -25,7 +26,7 @@ const normalizeExperience = (raw) => {
 };
 
 const BULLETS = [
-    "Tailored question sets for any role and seniority.",
+    "Questions built from your real résumé — your projects and skills.",
     "Real-time follow-ups that probe your reasoning.",
     "A scored report the moment you finish.",
 ];
@@ -37,62 +38,76 @@ function Step1SetUp({ onStart }) {
     const [experience, setExperience] = useState("");
     const [mode, setMode] = useState("Technical");
     const [resumeFile, setResumeFile] = useState(null);
-    const [loading, setLoading] = useState(false);
-    const [projects, setProjects] = useState([]);
-    const [skills, setSkills] = useState([]);
-    const [resumeText, setResumeText] = useState("");
-    const [analysisDone, setAnalysisDone] = useState(false);
-    const [analyzing, setAnalyzing] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const [stage, setStage] = useState("");
     const [error, setError] = useState("");
 
-    const handleUploadResume = async () => {
-        if (!resumeFile || analyzing) return;
-        setAnalyzing(true)
-        setError("")
+    // Single flow: analyze the (required) résumé, then generate the interview.
+    // A loading bar covers both steps; there's no separate "Analyze" button.
+    const handleBegin = async () => {
+        if (busy) return;
+        setError("");
 
-        const formdata = new FormData()
-        formdata.append("resume", resumeFile)
-
-        try {
-            const result = await axios.post(ServerUrl + "/api/interview/resume", formdata, { withCredentials: true })
-
-            setRole(result.data.role || "");
-            setExperience(normalizeExperience(result.data.experience));
-            setProjects(result.data.projects || []);
-            setSkills(result.data.skills || []);
-            setResumeText(result.data.resumeText || "");
-            setAnalysisDone(true);
-            setAnalyzing(false);
-        } catch (error) {
-            console.log(error)
-            setError(error.response?.data?.message || "Failed to analyze resume. Please try again.")
-            setAnalyzing(false);
+        if (!resumeFile) {
+            setError("Please upload your résumé (PDF) — the interview is based on it.");
+            return;
         }
-    }
 
-    const handleStart = async () => {
-        setLoading(true)
-        setError("")
+        setBusy(true);
         try {
-            const result = await axios.post(ServerUrl + "/api/interview/generate-questions", { role, experience, mode, resumeText, projects, skills }, { withCredentials: true })
-            if (userData) {
-                dispatch(setUserData({ ...userData, credits: result.data.creditsLeft }))
+            // 1) Analyze résumé
+            setStage("Analyzing your résumé…");
+            const formdata = new FormData();
+            formdata.append("resume", resumeFile);
+
+            let analysis;
+            try {
+                const res = await axios.post(ServerUrl + "/api/interview/resume", formdata, { withCredentials: true });
+                analysis = res.data;
+            } catch (err) {
+                // 422 = not a resume; surface that message specifically.
+                setError(err.response?.data?.message || "Failed to read your résumé. Please try another PDF.");
+                setBusy(false);
+                return;
             }
-            setLoading(false)
-            onStart(result.data)
-        } catch (error) {
-            console.log(error)
-            // Surface the real reason (e.g. "Not enough credits") instead of failing silently.
-            setError(error.response?.data?.message || "Something went wrong. Please try again.")
-            setLoading(false)
-        }
-    }
 
-    const inputBase = 'mt-2.5 w-full h-[46px] px-4 rounded-xl bg-white/[0.03] border border-white/10 text-zinc-100 text-sm outline-none transition focus:border-[rgba(192,192,192,0.55)]'
+            const resumeText = analysis.resumeText || "";
+            const projects = analysis.projects || [];
+            const skills = analysis.skills || [];
+            const finalRole = (role || analysis.role || "").trim();
+            const finalExp = experience || normalizeExperience(analysis.experience) || "Fresher";
+
+            if (!finalRole) {
+                setError("Couldn't determine a role from your résumé. Please type the role you're interviewing for.");
+                setBusy(false);
+                return;
+            }
+
+            // 2) Generate the interview from the résumé
+            setStage("Preparing your interview…");
+            const result = await axios.post(
+                ServerUrl + "/api/interview/generate-questions",
+                { role: finalRole, experience: finalExp, mode, resumeText, projects, skills },
+                { withCredentials: true }
+            );
+
+            if (userData) {
+                dispatch(setUserData({ ...userData, credits: result.data.creditsLeft }));
+            }
+            onStart(result.data);
+        } catch (error) {
+            console.log(error);
+            setError(error.response?.data?.message || "Something went wrong. Please try again.");
+            setBusy(false);
+        }
+    };
+
+    const inputBase = 'mt-2.5 w-full h-[46px] px-4 rounded-xl bg-white/[0.03] border border-white/10 text-zinc-100 text-sm outline-none transition focus:border-[rgba(192,192,192,0.55)] disabled:opacity-50'
     const pill = (active) => `flex-1 h-10 rounded-[10px] text-sm font-medium transition ${active ? 'btn-metal' : 'bg-transparent text-zinc-400 hover:text-zinc-200'}`
 
     return (
         <div className='relative min-h-screen' style={{ background: '#080808', color: '#f4f4f5' }}>
+            {busy && <LoadingOverlay stage={stage} />}
             <AnimatedBackground />
             <div className='relative z-10 min-h-screen grid md:grid-cols-[1.05fr_1fr]'>
 
@@ -129,7 +144,7 @@ function Step1SetUp({ onStart }) {
                     className='flex items-center justify-center px-6 py-[8vh]'>
                     <div className='w-full max-w-[440px] glass rounded-[22px] p-9' style={{ boxShadow: '0 0 60px rgba(0,0,0,0.4)' }}>
                         <div className='text-[22px] font-medium tracking-tight text-zinc-50'>Interview setup</div>
-                        <div className='text-[13.5px] text-zinc-400 mt-1.5 font-light'>Configure your session in under a minute.</div>
+                        <div className='text-[13.5px] text-zinc-400 mt-1.5 font-light'>Upload your résumé — your interview is built from it.</div>
 
                         {error && (
                             <div className='mt-5 px-4 py-3 rounded-xl text-[13px] flex items-center gap-2.5'
@@ -139,23 +154,39 @@ function Step1SetUp({ onStart }) {
                             </div>
                         )}
 
-                        {/* role */}
+                        {/* resume upload (required) */}
                         <div className='mt-6'>
-                            <label className='text-[12.5px] text-zinc-400 font-medium tracking-wide'>Role</label>
-                            <input type='text' placeholder='e.g. Senior Frontend Engineer'
-                                className={inputBase}
+                            <label className='text-[12.5px] text-zinc-400 font-medium tracking-wide'>Résumé <span className='text-metal'>* required</span></label>
+                            <motion.div
+                                whileHover={!busy ? { scale: 1.01 } : {}}
+                                onClick={() => !busy && document.getElementById("resumeUpload").click()}
+                                className='mt-2.5 min-h-[88px] flex flex-col items-center justify-center p-5 rounded-[13px] cursor-pointer transition text-center'
+                                style={{ border: `1px dashed ${resumeFile ? 'rgba(192,192,192,0.6)' : 'rgba(192,192,192,0.3)'}`, background: 'rgba(255,255,255,0.02)', opacity: busy ? 0.6 : 1 }}>
+                                <input type="file" accept="application/pdf" id="resumeUpload" className='hidden' disabled={busy}
+                                    onChange={(e) => { setResumeFile(e.target.files[0]); setError(""); }} />
+                                <div className='text-sm text-zinc-200'>{resumeFile ? resumeFile.name : "Drop your résumé here"}</div>
+                                <div className='text-[13px] text-zinc-500 font-light mt-0.5'>{resumeFile ? "Tap to choose a different file" : "PDF · click to browse"}</div>
+                            </motion.div>
+                        </div>
+
+                        {/* role (optional — auto-filled from résumé) */}
+                        <div className='mt-4'>
+                            <label className='text-[12.5px] text-zinc-400 font-medium tracking-wide'>Role <span className='text-zinc-600'>(optional — auto-filled from résumé)</span></label>
+                            <input type='text' placeholder='e.g. Frontend Engineer'
+                                className={inputBase} disabled={busy}
                                 onChange={(e) => setRole(e.target.value)} value={role} />
                         </div>
 
-                        {/* experience */}
+                        {/* experience (optional — auto-filled) */}
                         <div className='mt-4'>
-                            <label className='text-[12.5px] text-zinc-400 font-medium tracking-wide'>Experience</label>
+                            <label className='text-[12.5px] text-zinc-400 font-medium tracking-wide'>Experience <span className='text-zinc-600'>(optional)</span></label>
                             <div className='relative'>
                                 <select
                                     value={experience}
                                     onChange={(e) => setExperience(e.target.value)}
+                                    disabled={busy}
                                     className={inputBase + ' appearance-none cursor-pointer pr-10'}>
-                                    <option value="" style={{ background: '#141414' }}>Select experience</option>
+                                    <option value="" style={{ background: '#141414' }}>Auto from résumé</option>
                                     {EXPERIENCE_OPTIONS.map((opt) => (
                                         <option key={opt} value={opt} style={{ background: '#141414' }}>{opt}</option>
                                     ))}
@@ -168,70 +199,17 @@ function Step1SetUp({ onStart }) {
                         <div className='mt-4'>
                             <label className='text-[12.5px] text-zinc-400 font-medium tracking-wide'>Interview mode</label>
                             <div className='mt-2.5 flex p-1 rounded-[13px] bg-white/[0.03] border border-white/10'>
-                                <button onClick={() => setMode("Technical")} className={pill(mode === "Technical")}>Technical</button>
-                                <button onClick={() => setMode("HR")} className={pill(mode === "HR")}>HR</button>
+                                <button onClick={() => !busy && setMode("Technical")} className={pill(mode === "Technical")}>Technical</button>
+                                <button onClick={() => !busy && setMode("HR")} className={pill(mode === "HR")}>HR</button>
                             </div>
                         </div>
 
-                        {/* resume upload */}
-                        {!analysisDone && (
-                            <div className='mt-4'>
-                                <label className='text-[12.5px] text-zinc-400 font-medium tracking-wide'>Resume <span className='text-zinc-600'>(optional)</span></label>
-                                <motion.div
-                                    whileHover={{ scale: 1.01 }}
-                                    onClick={() => document.getElementById("resumeUpload").click()}
-                                    className='mt-2.5 min-h-[78px] flex flex-col items-center justify-center p-4 rounded-[13px] cursor-pointer transition'
-                                    style={{ border: `1px dashed ${resumeFile ? 'rgba(192,192,192,0.6)' : 'rgba(192,192,192,0.3)'}`, background: 'rgba(255,255,255,0.02)' }}>
-                                    <input type="file" accept="application/pdf" id="resumeUpload" className='hidden'
-                                        onChange={(e) => setResumeFile(e.target.files[0])} />
-                                    <div className='text-center text-[13px] text-zinc-400 font-light'>
-                                        <div className='text-sm text-zinc-200 mb-0.5'>{resumeFile ? resumeFile.name : "Drop your résumé here"}</div>
-                                        {resumeFile ? "Ready to analyze" : "PDF · click to browse"}
-                                    </div>
-                                    {resumeFile && (
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleUploadResume() }}
-                                            className='mt-3 px-5 py-2 rounded-lg text-sm font-medium bg-white/[0.06] border border-white/10 text-zinc-200 hover:border-white/25 transition'>
-                                            {analyzing ? "Analyzing..." : "Analyze Resume"}
-                                        </button>
-                                    )}
-                                </motion.div>
-                            </div>
-                        )}
-
-                        {analysisDone && (
-                            <motion.div
-                                initial={{ opacity: 0, y: 12 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className='mt-4 glass rounded-xl p-5 space-y-4'>
-                                <h3 className='text-sm font-semibold text-zinc-100'>Résumé analysis</h3>
-                                {projects.length > 0 && (
-                                    <div>
-                                        <p className='text-[13px] font-medium text-zinc-400 mb-1.5'>Projects</p>
-                                        <ul className='list-disc list-inside text-zinc-400 text-sm space-y-1 font-light'>
-                                            {projects.map((p, i) => (<li key={i}>{p}</li>))}
-                                        </ul>
-                                    </div>
-                                )}
-                                {skills.length > 0 && (
-                                    <div>
-                                        <p className='text-[13px] font-medium text-zinc-400 mb-1.5'>Skills</p>
-                                        <div className='flex flex-wrap gap-2'>
-                                            {skills.map((s, i) => (
-                                                <span key={i} className='px-3 py-1 rounded-full text-xs text-zinc-300 bg-white/[0.05] border border-white/10'>{s}</span>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </motion.div>
-                        )}
-
                         <button
-                            onClick={handleStart}
-                            disabled={!role || !experience || loading}
+                            onClick={handleBegin}
+                            disabled={!resumeFile || busy}
                             className='relative overflow-hidden mt-6 w-full h-[50px] rounded-[14px] btn-metal font-semibold text-[15.5px] disabled:opacity-40 disabled:cursor-not-allowed'>
-                            {loading ? "Starting..." : "Start Interview"}
-                            {!loading && !(!role || !experience) && (
+                            {busy ? "Please wait…" : "Begin Interview"}
+                            {!busy && resumeFile && (
                                 <span className='absolute top-0 bottom-0 w-1/3 pointer-events-none'
                                     style={{ background: 'linear-gradient(120deg,transparent,rgba(255,255,255,0.85),transparent)', animation: 'shimmer 4.5s ease-in-out infinite' }}></span>
                             )}
