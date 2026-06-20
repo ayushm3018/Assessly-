@@ -11,8 +11,8 @@ import { deepgramToken } from "../utils/interviewApi";
  * How it works: the mic stream is acquired once up front (no mid-interview prompt
  * that would trip a window-blur strike). Each listening session fetches a short
  * ephemeral token from our server, opens a Deepgram live socket with it, and pipes
- * MediaRecorder chunks in. Finals accumulate into `answer`; interims stream into
- * `interimText`. The long-lived API key never reaches the browser.
+ * MediaRecorder chunks in. Interim words stream into `interimText` within ~1s;
+ * finals accumulate into `answer`. The long-lived API key never reaches the browser.
  *
  * @param enabled       acquire mic permission + start once this turns true
  * @param isSpeakingRef live ref to "AI is speaking" so the mic stays muted then
@@ -41,7 +41,7 @@ export default function useDeepgramSpeech({ enabled, isSpeakingRef, onActivity }
   const micOnRef = useRef(true); // does the user *want* the mic listening?
   const micPermissionRef = useRef(false);
   const runningRef = useRef(false); // a listening session is starting/active
-  const streamRef = useRef(null); // persistent mic stream (kept for the session)
+  const streamRef = useRef(null); // persistent mic stream
   const connRef = useRef(null); // current Deepgram live socket
   const recorderRef = useRef(null); // current MediaRecorder
   const sessionRef = useRef(0); // bumped on every start/stop to cancel stale async
@@ -84,6 +84,10 @@ export default function useDeepgramSpeech({ enabled, isSpeakingRef, onActivity }
   const startMic = useCallback(async () => {
     if (isSpeakingRef?.current || runningRef.current) return;
     if (!micPermissionRef.current || !streamRef.current) return;
+    if (!window.MediaRecorder) {
+      setMicError("This browser can't record audio — you can type your answer instead.");
+      return;
+    }
 
     runningRef.current = true;
     const session = ++sessionRef.current;
@@ -114,7 +118,7 @@ export default function useDeepgramSpeech({ enabled, isSpeakingRef, onActivity }
             try { conn.sendMedia(e.data); } catch {}
           }
         };
-        rec.start(250); // emit a chunk every 250ms
+        rec.start(250); // emit a chunk every 250ms → sub-second live transcription
       });
 
       conn.on("message", (msg) => {

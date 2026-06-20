@@ -1,0 +1,11 @@
+node_modules
+npm-debug.log
+# Secrets — provided at runtime via env_file + volume mount, never baked into the image
+.env
+config/serviceAccount.json
+# Uploaded files — backed by a named volume, not the image
+public/*
+!public/.gitkeep
+.git
+Dockerfile
+.dockerignore

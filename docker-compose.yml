@@ -1,0 +1,56 @@
+# Assessly — single-box deployment.
+#   client (nginx) : serves the React build + reverse-proxies /api → server
+#   server (node)  : Express API, only reachable inside the compose network
+#   certbot        : obtains + auto-renews the Let's Encrypt cert (Phase D)
+#
+# Build args for the client (Vite inlines them at build time) are read from a
+# root .env file next to this compose file, e.g.:
+#   VITE_SERVER_URL=          (empty → same-origin)
+#   VITE_RAZORPAY_KEY_ID=rzp_...
+#   VITE_FIREBASE_APIKEY=...
+
+services:
+  server:
+    build: ./server
+    env_file:
+      - ./server/.env
+    environment:
+      NODE_ENV: production
+      PORT: "8000"
+    volumes:
+      # Firebase Admin credentials (read-only); never baked into the image.
+      - ./server/config/serviceAccount.json:/app/config/serviceAccount.json:ro
+      # Persist uploaded resumes across container restarts.
+      - uploads:/app/public
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  client:
+    build:
+      context: ./client
+      args:
+        VITE_SERVER_URL: "${VITE_SERVER_URL:-}"
+        VITE_RAZORPAY_KEY_ID: "${VITE_RAZORPAY_KEY_ID:-}"
+        VITE_FIREBASE_APIKEY: "${VITE_FIREBASE_APIKEY:-}"
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - server
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    restart: unless-stopped
+
+  # Renews the certificate every 12h. Initial issuance is a one-off command in Phase D.
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    restart: unless-stopped
+
+volumes:
+  uploads:

@@ -2,6 +2,17 @@ import genToken from "../config/token.js"
 import User from "../models/user.model.js"
 import { adminAuth } from "../config/firebaseAdmin.js"
 
+// Shared auth-cookie options. In production the app is served over HTTPS same-origin
+// (behind nginx), so the cookie is Secure; sameSite "lax" is enough for same-origin
+// and still works in local dev (different ports are same-site). clearCookie on logout
+// must use these same options or the browser won't reliably remove the cookie.
+const isProd = process.env.NODE_ENV === "production"
+const cookieOptions = {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: "lax",
+}
+
 
 export const googleAuth = async (req,res) => {
     try {
@@ -32,9 +43,7 @@ export const googleAuth = async (req,res) => {
         }
         let token = await genToken(user._id)
         res.cookie("token" , token , {
-            httpOnly:true,
-            secure:false, // set true in production (HTTPS)
-            sameSite:"strict",
+            ...cookieOptions,
             maxAge:7 * 24 * 60 * 60 * 1000
         })
 
@@ -50,7 +59,7 @@ export const googleAuth = async (req,res) => {
 
 export const logOut = async (req,res) => {
     try {
-        await res.clearCookie("token")
+        await res.clearCookie("token", cookieOptions)
         return res.status(200).json({message:"LogOut Successfully"})
     } catch (error) {
          return res.status(500).json({message:`Logout error ${error}`})
