@@ -1,0 +1,84 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+/* ============================================================
+   InterviewIQ — premium dark / silver (platinum) design system
+   ============================================================ */
+
+:root {
+  /* metallic silver accent */
+  --accent-grad: linear-gradient(135deg, #c0c0c0, #ffffff, #a0a0a0);
+  --accent-1: #c0c0c0;
+  --accent-2: #ffffff;
+  --accent-3: #9a9aa3;
+  --accent-soft: rgba(200, 200, 200, 0.4);
+  --accent-glow: rgba(200, 200, 200, 0.18);
+
+  /* glass surfaces */
+  --surface-bg: rgba(255, 255, 255, 0.04);
+  --surface-border: rgba(255, 255, 255, 0.08);
+  --surface-blur: 20px;
+
+  /* ambient lighting */
+  --ink: #080808;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--ink);
+  color: #f4f4f5;
+  font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: rgba(192, 192, 192, 0.25);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #080808;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* ---------- animations (ported from the imported design) ---------- */
+@keyframes shimmer { 0%{transform:translateX(-120%)} 60%{transform:translateX(220%)} 100%{transform:translateX(220%)} }
+@keyframes floaty { 0%{transform:translateY(0)} 50%{transform:translateY(-10px)} 100%{transform:translateY(0)} }
+@keyframes spinSlow { 0%{transform:rotate(0)} 100%{transform:rotate(360deg)} }
+@keyframes idlePulse { 0%{transform:scale(1);opacity:0.5} 50%{transform:scale(1.06);opacity:0.85} 100%{transform:scale(1);opacity:0.5} }
+@keyframes wave { 0%{transform:scaleY(0.18)} 50%{transform:scaleY(1)} 100%{transform:scaleY(0.18)} }
+@keyframes orbDrift { 0%{transform:translate(0,0) scale(1)} 50%{transform:translate(-6%,8%) scale(1.08)} 100%{transform:translate(0,0) scale(1)} }
+@keyframes bgSpin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+@keyframes blobA { 0%{transform:translate(0,0) scale(1)} 33%{transform:translate(16vw,11vh) scale(1.32)} 66%{transform:translate(7vw,-9vh) scale(0.92)} 100%{transform:translate(0,0) scale(1)} }
+@keyframes blobB { 0%{transform:translate(0,0) scale(1.1)} 33%{transform:translate(-14vw,9vh) scale(0.88)} 66%{transform:translate(-20vw,-7vh) scale(1.24)} 100%{transform:translate(0,0) scale(1.1)} }
+@keyframes blobC { 0%{transform:translate(0,0) scale(1)} 50%{transform:translate(12vw,-15vh) scale(1.28)} 100%{transform:translate(0,0) scale(1)} }
+
+/* utility helpers */
+.text-metal {
+  background: var(--accent-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.glass {
+  background: var(--surface-bg);
+  -webkit-backdrop-filter: blur(var(--surface-blur));
+  backdrop-filter: blur(var(--surface-blur));
+  border: 1px solid var(--surface-border);
+}
+.btn-metal {
+  background: var(--accent-grad);
+  color: #0a0a0a;
+  box-shadow: 0 0 40px rgba(200, 200, 200, 0.18);
+}
