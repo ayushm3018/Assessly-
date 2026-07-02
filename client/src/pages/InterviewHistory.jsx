@@ -28,9 +28,13 @@ function InterviewHistory() {
         return 'linear-gradient(135deg,#f87171,#fca5a5,#ef4444)';
     };
 
-    const scores = interviews.map((i) => i.finalScore || 0)
-    const avg = scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1) : "0.0"
-    const best = scores.length ? Math.max(...scores).toFixed(1) : "0.0"
+    const isFinished = (i) => i.status === "completed"
+
+    // Average/best only consider finished interviews — abandoned runs score 0 and
+    // would otherwise drag these stats down misleadingly.
+    const completedScores = interviews.filter(isFinished).map((i) => i.finalScore || 0)
+    const avg = completedScores.length ? (completedScores.reduce((a, b) => a + b, 0) / completedScores.length).toFixed(1) : "—"
+    const best = completedScores.length ? Math.max(...completedScores).toFixed(1) : "—"
 
     return (
         <div className='relative min-h-screen' style={{ background: '#080808', color: '#f4f4f5' }}>
@@ -83,8 +87,12 @@ function InterviewHistory() {
                                             {new Date(item.createdAt).toLocaleDateString()}
                                         </p>
                                     </div>
-                                    <span className='flex-none w-11 h-11 rounded-xl flex items-center justify-center text-base font-bold text-[#0a0a0a]'
-                                        style={{ background: badge(item.finalScore || 0) }}>{Number(item.finalScore || 0).toFixed(1)}</span>
+                                    {isFinished(item) ? (
+                                        <span className='flex-none w-11 h-11 rounded-xl flex items-center justify-center text-base font-bold text-[#0a0a0a]'
+                                            style={{ background: badge(item.finalScore || 0) }}>{Number(item.finalScore || 0).toFixed(1)}</span>
+                                    ) : (
+                                        <span className='flex-none w-11 h-11 rounded-xl flex items-center justify-center text-lg font-light text-zinc-500 bg-white/[0.04] border border-white/10'>—</span>
+                                    )}
                                 </div>
                                 <div className='flex flex-wrap items-center gap-2 mt-5'>
                                     <span className='flex-none text-[11.5px] px-3 py-1.5 rounded-full font-medium'
@@ -99,9 +107,9 @@ function InterviewHistory() {
                                             {item.experience}
                                         </span>
                                     )}
-                                    <span className={`flex-none text-[11.5px] px-3 py-1.5 rounded-full font-medium ${item.status === "completed" ? 'text-emerald-300' : 'text-amber-300'}`}
-                                        style={{ background: item.status === "completed" ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', border: `1px solid ${item.status === "completed" ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'}` }}>
-                                        {item.status}
+                                    <span className={`flex-none text-[11.5px] px-3 py-1.5 rounded-full font-medium ${isFinished(item) ? 'text-emerald-300' : 'text-amber-300'}`}
+                                        style={{ background: isFinished(item) ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', border: `1px solid ${isFinished(item) ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'}` }}>
+                                        {isFinished(item) ? "Completed" : "Not finished"}
                                     </span>
                                 </div>
                             </motion.div>
