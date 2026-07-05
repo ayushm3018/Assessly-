@@ -42,9 +42,25 @@ const interviewSchema = new mongoose.Schema({
 
     finalScore: { type: Number, default: 0 },
 
+    // Number of proctoring violations (tab switch / exit fullscreen / window
+    // switch / camera detections) recorded during the interview. Counted
+    // server-side so it can't be tampered with from the browser.
+    violationCount: { type: Number, default: 0 },
+
+    // Log of what was detected, so a terminated report can explain *why*.
+    violations: {
+      type: [
+        {
+          reason: String,
+          at: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
+
     status: {
       type: String,
-      enum: ["Incompleted", "completed"],
+      enum: ["Incompleted", "completed", "terminated"],
       default: "Incompleted",
     }
 },{timestamps:true})

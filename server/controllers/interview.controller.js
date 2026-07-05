@@ -5,6 +5,10 @@ import { synthesizeSpeech } from "../services/tts.service.js";
 import User from "../models/user.model.js";
 import Interview from "../models/interview.model.js";
 
+// A candidate may leave the interview surface (switch tab, exit fullscreen,
+// switch apps) this many times before the interview is auto-terminated.
+const MAX_VIOLATIONS = 3;
+
 // Turns the candidate's experience into a difficulty + timing plan so the
 // experience they enter actually changes the interview structure (harder
 // progression and more thinking time for seniors), not just a prompt hint.
@@ -448,6 +452,12 @@ export const finishInterview = async (req,res) => {
       return res.status(403).json({ message: "Not authorized for this interview" });
     }
 
+    // A terminated interview can never be "finished" into a real score —
+    // always return the locked, zeroed terminated report.
+    if (interview.status === "terminated") {
+      return res.status(200).json(buildTerminatedReport(interview));
+    }
+
     const totalQuestions = interview.questions.length;
 
     let totalScore = 0;
@@ -503,6 +513,101 @@ export const finishInterview = async (req,res) => {
 }
 
 
+// Shared shape for a terminated interview's report. Score is always 0 and all
+// metrics are zeroed — the run is void, regardless of partial answers.
+const buildTerminatedReport = (interview) => ({
+  terminated: true,
+  status: "terminated",
+  violationCount: interview.violationCount,
+  // De-duplicated list of what was detected, so the report can explain why.
+  violationReasons: [...new Set((interview.violations || []).map((v) => v.reason).filter(Boolean))],
+  finalScore: 0,
+  confidence: 0,
+  communication: 0,
+  correctness: 0,
+  questionWiseScore: interview.questions.map((q) => ({
+    question: q.question,
+    score: q.score || 0,
+    feedback: q.feedback || "",
+    confidence: q.confidence || 0,
+    communication: q.communication || 0,
+    correctness: q.correctness || 0,
+  })),
+});
+
+// Records a single proctoring violation reported by the client and, once the
+// threshold is crossed, terminates the interview with a locked score of 0.
+// The count and the terminate decision live here (not in the browser) so they
+// can't be tampered with — the client only reports that something happened.
+export const recordViolation = async (req, res) => {
+  try {
+    const { interviewId, reason } = req.body;
+
+    if (!interviewId) {
+      return res.status(400).json({ message: "interviewId is required" });
+    }
+
+    const interview = await Interview.findById(interviewId);
+
+    if (!interview) {
+      return res.status(404).json({ message: "Interview not found" });
+    }
+
+    // Ownership check: only the owner can affect their own interview.
+    if (interview.userId.toString() !== req.userId) {
+      return res.status(403).json({ message: "Not authorized for this interview" });
+    }
+
+    // Idempotency: a finished or already-terminated interview is immutable.
+    if (interview.status === "terminated") {
+      return res.status(200).json(buildTerminatedReport(interview));
+    }
+    if (interview.status === "completed") {
+      return res.status(200).json({
+        terminated: false,
+        completed: true,
+        violationCount: interview.violationCount,
+        warningsLeft: Math.max(0, MAX_VIOLATIONS - interview.violationCount),
+      });
+    }
+
+    // Atomic increment, guarded on status so concurrent reports can't re-count a
+    // run that another request already terminated.
+    const updated = await Interview.findOneAndUpdate(
+      { _id: interviewId, userId: req.userId, status: "Incompleted" },
+      {
+        $inc: { violationCount: 1 },
+        $push: { violations: { reason: reason || "unknown", at: new Date() } },
+      },
+      { new: true }
+    );
+
+    // The status changed out from under us (e.g. terminated by a racing request).
+    if (!updated) {
+      const fresh = await Interview.findById(interviewId);
+      if (fresh?.status === "terminated") {
+        return res.status(200).json(buildTerminatedReport(fresh));
+      }
+      return res.status(409).json({ message: "Interview is no longer in progress" });
+    }
+
+    if (updated.violationCount >= MAX_VIOLATIONS) {
+      updated.status = "terminated";
+      updated.finalScore = 0;
+      await updated.save();
+      return res.status(200).json(buildTerminatedReport(updated));
+    }
+
+    return res.status(200).json({
+      terminated: false,
+      violationCount: updated.violationCount,
+      warningsLeft: MAX_VIOLATIONS - updated.violationCount,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: `failed to record violation ${error}` });
+  }
+};
+
 export const getMyInterviews = async (req,res) => {
   try {
     const interviews = await Interview.find({userId:req.userId})
@@ -527,6 +632,11 @@ export const getInterviewReport = async (req,res) => {
     // Ownership check: prevents reading someone else's report by guessing its id.
     if (interview.userId.toString() !== req.userId) {
       return res.status(403).json({ message: "Not authorized for this interview" });
+    }
+
+    // A terminated run is void — return the locked, zeroed report.
+    if (interview.status === "terminated") {
+      return res.json(buildTerminatedReport(interview));
     }
 
 
@@ -554,6 +664,8 @@ export const getInterviewReport = async (req,res) => {
       : 0;
 
        return res.json({
+      status: interview.status,
+      terminated: false,
       finalScore: interview.finalScore,
       confidence: Number(avgConfidence.toFixed(1)),
       communication: Number(avgCommunication.toFixed(1)),
