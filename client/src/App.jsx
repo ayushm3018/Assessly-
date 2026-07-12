@@ -1,7 +1,7 @@
 import React from 'react'
 import { Route, Routes } from 'react-router-dom'
 import Home from './pages/Home'
-import Auth from './pages/auth'
+import Auth from './pages/Auth'
 import { useEffect } from 'react'
 import axios from 'axios'
 import { useDispatch } from 'react-redux'
@@ -11,7 +11,12 @@ import InterviewHistory from './pages/InterviewHistory'
 import Pricing from './pages/Pricing'
 import InterviewReport from './pages/InterviewReport'
 
-export const ServerUrl  = "http://localhost:8000"
+// API base URL. In production the app is served same-origin behind nginx, so this
+// is empty → all calls become relative ("/api/...") and hit the same host that
+// served the page (nginx proxies /api to the Node container). In local dev,
+// client/.env sets VITE_SERVER_URL=http://localhost:8000 to reach the dev server.
+export const ServerUrl = import.meta.env.VITE_SERVER_URL ?? ""
+
 
 function App() {
 

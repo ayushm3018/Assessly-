@@ -10,8 +10,17 @@ import interviewRouter from "./routes/interview.route.js"
 import paymentRouter from "./routes/payment.route.js"
 
 const app = express()
+
+// Allowed browser origins. In production the app is same-origin behind nginx, but
+// we still set CLIENT_URL (the public https URL) as a safety net. Locally it falls
+// back to the Vite dev server. Comma-separate to allow more than one origin.
+const allowedOrigins = (process.env.CLIENT_URL || "http://localhost:5173")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean)
+
 app.use(cors({
-    origin:"http://localhost:5173",
+    origin: allowedOrigins,
     credentials:true
 }))
 
