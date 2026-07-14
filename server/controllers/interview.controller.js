@@ -2,6 +2,7 @@ import fs from "fs"
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import { askAi, askAiJson } from "../services/openRouter.service.js";
 import { synthesizeSpeech } from "../services/tts.service.js";
+import { createDeepgramToken } from "../services/deepgram.service.js";
 import User from "../models/user.model.js";
 import Interview from "../models/interview.model.js";
 
@@ -697,6 +698,20 @@ export const textToSpeech = async (req, res) => {
     return res.send(audio);
   } catch (error) {
     return res.status(500).json({ message: `TTS failed ${error}` });
+  }
+}
+
+// Mints a short-lived Deepgram token so the browser can open a live speech-to-text
+// socket for real-time transcription, without ever seeing the long-lived API key.
+export const getDeepgramToken = async (req, res) => {
+  try {
+    const token = await createDeepgramToken();
+    return res.status(200).json(token); // { accessToken, expiresIn }
+  } catch (error) {
+    // Log the real cause to the server console — the client only sees a generic
+    // message. A 403 here means the API key lacks the "Member" role (token auth).
+    console.error("[deepgram] token grant failed:", error?.message || error);
+    return res.status(500).json({ message: `Failed to issue speech token: ${error.message}` });
   }
 }
 
