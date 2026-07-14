@@ -16,6 +16,9 @@ ARG VITE_FIREBASE_APIKEY=""
 ENV VITE_SERVER_URL=$VITE_SERVER_URL \
     VITE_RAZORPAY_KEY_ID=$VITE_RAZORPAY_KEY_ID \
     VITE_FIREBASE_APIKEY=$VITE_FIREBASE_APIKEY
+# Raise Node's heap limit so the Vite/Rollup build doesn't OOM (exit 134) on small
+# instances (e.g. a 1GB t3.micro, where Node's default heap ceiling is too low).
+ENV NODE_OPTIONS=--max-old-space-size=2048
 RUN npm run build
 
 # --- Stage 2: serve static files + reverse-proxy /api ---
