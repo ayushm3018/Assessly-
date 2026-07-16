@@ -35,6 +35,9 @@ const interviewSchema = new mongoose.Schema({
         enum:["HR" ,"Technical"],
         required:true
     },
+    // Only used to generate the questions at creation time; cleared to "" once the
+    // interview is completed or terminated, so we don't keep resume PII at rest for
+    // the life of the record. Empty string on a finished interview is expected.
     resumeText:{
      type:String
     },

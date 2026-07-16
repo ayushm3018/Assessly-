@@ -491,6 +491,10 @@ export const finishInterview = async (req,res) => {
 
     interview.finalScore = finalScore;
     interview.status = "completed";
+    // The resume text is only needed to generate the questions. Once the interview
+    // is over we never read it again, so clear it instead of leaving PII (name,
+    // email, phone) sitting in the DB for the life of the record.
+    interview.resumeText = "";
 
     await interview.save();
 
@@ -595,6 +599,8 @@ export const recordViolation = async (req, res) => {
     if (updated.violationCount >= MAX_VIOLATIONS) {
       updated.status = "terminated";
       updated.finalScore = 0;
+      // The run is void and over — drop the stored resume text (PII) as well.
+      updated.resumeText = "";
       await updated.save();
       return res.status(200).json(buildTerminatedReport(updated));
     }
