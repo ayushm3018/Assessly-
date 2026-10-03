@@ -42,8 +42,8 @@ flowchart TB
         UI -.->|"webcam frames never leave"| MP
     end
 
-    subgraph edge["nginx container"]
-        NG["static build + reverse proxy<br/>TLS via Let's Encrypt"]
+    subgraph edge["Caddy container"]
+        NG["static build + reverse proxy<br/>automatic HTTPS"]
     end
 
     subgraph api["Node container"]
@@ -68,7 +68,7 @@ flowchart TB
     UI -.->|"direct WebSocket<br/>with ephemeral token"| DG
 ```
 
-The browser talks to exactly **one origin**. nginx serves the React build and reverse-proxies `/api` to the Node container, which is never exposed to the internet. That's why the auth cookie is a plain same-origin `httpOnly` cookie with no cross-site `SameSite=None` gymnastics.
+The browser talks to exactly **one origin**. Caddy serves the React build and reverse-proxies `/api` to the Node container, which is never exposed to the internet. That's why the auth cookie is a plain same-origin `httpOnly` cookie with no cross-site `SameSite=None` gymnastics.
 
 ---
 
@@ -135,7 +135,7 @@ sequenceDiagram
 
 **Auth verifies a Firebase ID token, not a posted email.** The client sends the signed `idToken`; the server calls `adminAuth.verifyIdToken` and takes the email from the *verified* payload. Trusting an email from the request body would let anyone sign in as anyone.
 
-**Rate limits are keyed per-user on the expensive routes.** Several endpoints call paid third parties with no credit cost to the caller — a loop would run up a real bill. Pre-auth routes are IP-keyed; post-auth routes key on `req.userId`, which is fairer behind shared NAT and ties the cap to the account. `trust proxy` is set to exactly **1** in production so the limiter reads the real client IP from nginx's `X-Forwarded-For`, and to `false` in dev where the header would be spoofable.
+**Rate limits are keyed per-user on the expensive routes.** Several endpoints call paid third parties with no credit cost to the caller — a loop would run up a real bill. Pre-auth routes are IP-keyed; post-auth routes key on `req.userId`, which is fairer behind shared NAT and ties the cap to the account. `trust proxy` is set to exactly **1** in production so the limiter reads the real client IP from Caddy's `X-Forwarded-For`, and to `false` in dev where the header would be spoofable.
 
 **Résumé text is deleted when the interview ends.** It's needed only to generate questions. On finish *or* termination, `resumeText` is set to `""` so name, email and phone don't sit in the database for the life of the record.
 
@@ -147,7 +147,7 @@ sequenceDiagram
 
 **Backend** — Node 20, Express 5, Mongoose 9, Firebase Admin, pdfjs-dist, msedge-tts, express-rate-limit, Multer, Razorpay
 
-**Infra** — Docker Compose, nginx (static + reverse proxy), Let's Encrypt via certbot with 12-hourly renewal, MongoDB Atlas
+**Infra** — Docker Compose, Caddy (static + reverse proxy, automatic HTTPS) on a shared EC2 box, MongoDB Atlas
 
 ---
 
@@ -207,18 +207,17 @@ VITE_RAZORPAY_KEY_ID=rzp_test_...
 
 ## Deployment
 
-Single-box Docker Compose. The client image is a two-stage build (Vite build → nginx), the server image is Node 20 slim.
+Assessly shares one EC2 box with my other project, CodeSync, instead of running on its own instance. That halves the hosting bill and keeps the app always on, with no cold starts.
 
 ```bash
-docker compose up -d --build
+./deploy/deploy.sh
 ```
 
-Two things that bite here and are handled explicitly:
+- **No web server of its own.** The Caddy container from the CodeSync stack terminates TLS for both sites. Assessly ships a site file (`deploy/assessly.caddy`) that Caddy imports, and the API container joins a shared `edge` Docker network so Caddy can reach it as `assessly-api`. The API is never exposed to the internet.
+- **The client is built locally, not on the box.** The Vite build needs more memory than a 1GB instance has to spare, so `deploy.sh` builds it and rsyncs the static files to `/srv/www/assessly`.
+- **Vite inlines env vars at build time.** `VITE_SERVER_URL` is empty in production, making every API call relative and same-origin.
 
-- **Vite inlines env vars at build time**, so `VITE_*` values are passed as Docker **build args**, not runtime env. In production `VITE_SERVER_URL` is empty, making every API call relative and same-origin.
-- **Node's default heap ceiling OOMs the Vite build on a 1GB instance** (exit 134). `NODE_OPTIONS=--max-old-space-size=2048` in the client Dockerfile fixes it.
-
-Secrets are never baked into images — `serviceAccount.json` is bind-mounted read-only and `.env` comes in via `env_file`.
+Secrets are never baked into images: `serviceAccount.json` is bind-mounted read-only and `.env` comes in via `env_file`.
 
 ---
 
